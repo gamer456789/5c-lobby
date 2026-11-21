@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>5C LOBBY</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#10152b;color:white;font-family:system-ui,Arial;overflow:hidden}
+#world{position:fixed;inset:0;background:linear-gradient(#18284c 0%,#6478a5 58%,#283b35 59%,#18251f 100%)}
+#sun{position:absolute;width:90px;height:90px;border-radius:50%;background:#ffe89a;top:8%;right:13%;box-shadow:0 0 60px #ffe89a}
+#ground{position:absolute;left:-10%;right:-10%;height:48%;bottom:-9%;background:repeating-linear-gradient(90deg,#47765c 0 90px,#3d6b52 90px 180px);transform:perspective(300px) rotateX(8deg)}
+.statue{position:absolute;bottom:37%;font-size:clamp(50px,10vw,115px);filter:drop-shadow(5px 8px 3px #111);text-align:center}
+#gojo{left:12%}#sukuna{right:12%}
+#sign{position:absolute;top:12%;left:50%;transform:translateX(-50%);font-size:clamp(20px,4vw,42px);font-weight:1000;color:#fff;text-shadow:0 0 8px #00eaff,0 0 22px #00eaff;text-align:center;white-space:nowrap}
+#hall{position:absolute;left:50%;bottom:32%;transform:translateX(-50%);font-size:clamp(50px,8vw,90px);filter:drop-shadow(0 8px 4px #111)}
+#player{position:absolute;left:50%;bottom:17%;transform:translateX(-50%);font-size:46px;filter:drop-shadow(0 4px 2px #111)}
+#hud{position:fixed;top:12px;left:12px;z-index:3;background:#10152bd9;padding:10px 13px;border:1px solid #6478a5;border-radius:12px}
+#hud strong{color:#69f5ff}#panel{position:fixed;z-index:4;right:12px;top:12px;width:min(310px,46vw);max-height:70vh;background:#10152bee;border:1px solid #7b8ab9;border-radius:14px;padding:10px;display:flex;flex-direction:column;gap:7px}
+input,button{font:inherit;border:0;border-radius:8px;padding:9px}input{min-width:0;background:#e9efff;color:#111}button{background:#5d68ed;color:white;font-weight:700;cursor:pointer}
+#messages{height:130px;overflow:auto;background:#080d1d;border-radius:8px;padding:7px;font-size:13px}
+.row{display:flex;gap:5px}.row input{width:50%}#chatrow input{flex:1}
+#touch{position:fixed;bottom:16px;left:12px;z-index:5;display:flex;gap:8px}
+#touch button{width:54px;height:54px;font-size:22px;background:#253b8ddd;border:1px solid #aabaff;touch-action:none}
+@media(min-width:800px){#panel{width:300px}#touch{opacity:.65}}
+</style>
+</head>
+<body>
+<div id="world"><div id="sun"></div><div id="ground"></div><div id="sign">⭐ 5C IS THE BEST! ⭐</div>
+<div id="gojo" class="statue">🧙🏻‍♂️<div style="font-size:14px">GOJO STATUE</div></div>
+<div id="sukuna" class="statue">👹<div style="font-size:14px">SUKUNA STATUE</div></div>
+<div id="hall">🏫</div><div id="player">🧍</div></div>
+<div id="hud"><strong>5C LOBBY</strong><br><span id="status">Connecting…</span><br>Move with WASD / arrows</div>
+<div id="panel">
+<div class="row"><input id="name" maxlength="18" placeholder="Your player name"><input id="room" maxlength="24" value="Main Lobby" aria-label="Room"></div>
+<button id="join">Join lobby</button>
+<div><b>Players here</b><div id="players">0</div></div>
+<b>Lobby chat</b><div id="messages"></div>
+<div class="row" id="chatrow"><input id="chat" maxlength="180" placeholder="Say hello…"><button id="send">Send</button></div>
+<details><summary>Admin announcement</summary><input id="token" placeholder="Admin token"><input id="announcement" placeholder="Announcement"><button id="announce">Send announcement</button><small>Set ADMIN_TOKEN privately in your hosting service first.</small></details>
+</div>
+<div id="touch"><button data-move="up">▲</button><button data-move="left">◀</button><button data-move="down">▼</button><button data-move="right">▶</button></div>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const socket=io(); const player=document.querySelector("#player");
+let x=50,y=17; const keys=new Set(); let joined=false;
+function move(dx,dy){x=Math.max(4,Math.min(96,x+dx));y=Math.max(5,Math.min(35,y+dy));player.style.left=x+"%";player.style.bottom=y+"%";}
+window.addEventListener("keydown",e=>{if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"," "].includes(e.key))e.preventDefault();keys.add(e.key.toLowerCase())});
+window.addEventListener("keyup",e=>keys.delete(e.key.toLowerCase()));
+setInterval(()=>{if(keys.has("a")||keys.has("arrowleft"))move(-1,0);if(keys.has("d")||keys.has("arrowright"))move(1,0);if(keys.has("w")||keys.has("arrowup"))move(0,1);if(keys.has("s")||keys.has("arrowdown"))move(0,-1)},55);
+document.querySelectorAll("[data-move]").forEach(b=>{
+ const dir=b.dataset.move, fn=e=>{e.preventDefault();({up:()=>move(0,1),down:()=>move(0,-1),left:()=>move(-1,0),right:()=>move(1,0)})[dir]()};
+ b.addEventListener("pointerdown",fn);
+});
+const messages=document.querySelector("#messages");
+function addMessage(t){const d=document.createElement("div");d.textContent=t;messages.appendChild(d);messages.scrollTop=messages.scrollHeight;}
+document.querySelector("#join").onclick=()=>{socket.emit("join",{name:document.querySelector("#name").value,room:document.querySelector("#room").value});joined=true};
+socket.on("connect",()=>document.querySelector("#status").textContent="Connected — join a lobby!");
+socket.on("disconnect",()=>document.querySelector("#status").textContent="Disconnected — reconnecting…");
+socket.on("joined",d=>{document.querySelector("#status").textContent="Room: "+d.room;addMessage("You joined "+d.room+".")});
+socket.on("notice",addMessage);
+socket.on("chat",d=>addMessage("["+d.time+"] "+d.name+": "+d.message));
+socket.on("announcement",m=>addMessage("📢 ADMIN: "+m));
+socket.on("players",p=>document.querySelector("#players").textContent=p.map(x=>x.name).join(", ")||"Nobody yet");
+function send(){const i=document.querySelector("#chat");if(i.value.trim()){socket.emit("chat",i.value);i.value=""}}
+document.querySelector("#send").onclick=send;document.querySelector("#chat").addEventListener("keydown",e=>{if(e.key==="Enter")send()});
+document.querySelector("#announce").onclick=()=>socket.emit("admin",{token:document.querySelector("#token").value,message:document.querySelector("#announcement").value});
+socket.on("adminResult",d=>addMessage(d.message));
+</script>
+</body></html>
